@@ -14,6 +14,7 @@ import androidx.annotation.NonNull;
 
 import com.example.project_prm392.Activity.Base.BaseActivity;
 
+import com.example.project_prm392.Activity.StudentInformation.UpdateProfileActivity;
 import com.example.project_prm392.Helper.DataEncode;
 import com.example.project_prm392.Helper.SendOTP;
 import com.example.project_prm392.Security.EnterCodeActivity;
@@ -92,9 +93,13 @@ public class ForgotPasswordActivity extends BaseActivity {
                     if (student != null) {
                         String verificationCode = new DataEncode().generateRandomCode();
 
-                        new SendMailTask().execute(email, "Xác minh là sinh viên đang đổi mật khẩu ví",
-                                "Mã xác minh quên mật khẩu FPTU Wallet của bạn là: " + verificationCode);
 
+                        new Thread(
+                                () -> {
+                                    new SendMailTask().execute(email, "Xác minh là sinh viên đang đổi mật khẩu ví",
+                                            "Mã xác minh quên mật khẩu FPTU Wallet của bạn là: " + verificationCode);
+                                }
+                        ).start();
                         Intent intent_1 = new Intent(ForgotPasswordActivity.this, EnterCodeActivity.class);
                         intent_1.putExtra("email", email);
                         intent_1.putExtra("code", verificationCode);

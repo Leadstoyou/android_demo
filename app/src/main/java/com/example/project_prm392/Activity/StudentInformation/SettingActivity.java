@@ -30,5 +30,13 @@ public class SettingActivity extends AppCompatActivity {
                 finish();
             }
         });
+        binding.imageView9.setOnClickListener(v -> {
+            startActivity(new Intent(SettingActivity.this, UserActivity.class));
+        });
+    }
+    @Override
+    public void onBackPressed() {
+        super.onBackPressed();
+        finish();
     }
 }

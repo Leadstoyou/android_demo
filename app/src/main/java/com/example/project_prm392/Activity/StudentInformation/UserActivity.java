@@ -9,6 +9,7 @@ import androidx.annotation.NonNull;
 import com.example.project_prm392.Activity.Authentication.LoginActivity;
 import com.example.project_prm392.Activity.Base.BaseActivity;
 import com.example.project_prm392.Activity.Base.MainActivity;
+import com.example.project_prm392.Activity.Report.ReportActivity;
 import com.example.project_prm392.databinding.ActivityUserBinding;
 import com.example.project_prm392.entities.Student;
 import com.google.firebase.database.DataSnapshot;
@@ -25,6 +26,7 @@ public class UserActivity extends BaseActivity {
         binding = ActivityUserBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         handleButton();
+        setVariable();
     }
     private void handleButton() {
         //Handle "Hồ sơ"
@@ -54,6 +56,7 @@ public class UserActivity extends BaseActivity {
         });
 
         binding.btnUserHome.setOnClickListener(v -> startActivity(new Intent(UserActivity.this, MainActivity.class)));
+        binding.btnUserReport.setOnClickListener(v -> {startActivity(new Intent(UserActivity.this, ReportActivity.class));});
     }
     private void setVariable() {
         SharedPreferences currentStudent = getSharedPreferences("currentStudent", MODE_PRIVATE);

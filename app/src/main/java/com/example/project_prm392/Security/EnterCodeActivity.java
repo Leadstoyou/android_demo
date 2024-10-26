@@ -83,6 +83,7 @@ public class EnterCodeActivity extends BaseActivity {
                     SharedPreferences.Editor editor = preferences.edit();
                     editor.clear(); // Xóa tất cả các giá trị
                     editor.apply();
+                    Toast.makeText(EnterCodeActivity.this, "Thay đổi hoàn tất", Toast.LENGTH_SHORT).show();
                 }
 
             }

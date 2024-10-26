@@ -57,4 +57,18 @@ public class Transaction implements Serializable {
     public String calculateHash() {
         return "";
     }
+
+    @Override
+    public String toString() {
+        return "Transaction{" +
+                "hash='" + hash + '\'' +
+                ", previousHash='" + previousHash + '\'' +
+                ", from='" + from + '\'' +
+                ", to='" + to + '\'' +
+                ", category='" + category + '\'' +
+                ", amount=" + amount +
+                ", time='" + time + '\'' +
+                ", transactionKey='" + transactionKey + '\'' +
+                '}';
+    }
 }

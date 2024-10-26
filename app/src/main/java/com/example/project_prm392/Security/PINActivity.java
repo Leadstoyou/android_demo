@@ -1,18 +1,26 @@
 package com.example.project_prm392.Security;
 
+import android.annotation.SuppressLint;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.StrictMode;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
-
+import com.example.project_prm392.API.ZaloPay.CreateOrder;
 import com.example.project_prm392.Activity.Base.BaseActivity;
-
+import com.example.project_prm392.Activity.Base.MainActivity;
+import com.example.project_prm392.Activity.Transaction.TransactionStatus.TransactionResultActivity;
+import com.example.project_prm392.Constant.AppInfo;
+import com.example.project_prm392.Constant.Constant;
 import com.example.project_prm392.Helper.DataEncode;
 import com.example.project_prm392.databinding.ActivityPinactivityBinding;
 import com.example.project_prm392.entities.Transaction;
@@ -23,8 +31,15 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
+
+import vn.zalopay.sdk.Environment;
+import vn.zalopay.sdk.ZaloPayError;
+import vn.zalopay.sdk.ZaloPaySDK;
+import vn.zalopay.sdk.listeners.PayOrderListener;
 
 public class PINActivity extends BaseActivity {
     ActivityPinactivityBinding binding;
@@ -38,6 +53,12 @@ public class PINActivity extends BaseActivity {
         binding = ActivityPinactivityBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         databaseReference = FirebaseDatabase.getInstance().getReference();
+        StrictMode.ThreadPolicy policy = new
+                StrictMode.ThreadPolicy.Builder().permitAll().build();
+        StrictMode.setThreadPolicy(policy);
+
+        // ZaloPay SDK Init
+        ZaloPaySDK.init(AppInfo.APP_ID, Environment.SANDBOX);
         setUpOTPInput();
         setConfirmButton();
     }
@@ -133,34 +154,68 @@ public class PINActivity extends BaseActivity {
         }
     }
 
+    @SuppressLint("DefaultLocale")
     private void performTransaction() {
         Intent intent = getIntent();
         int transactionType = intent.getIntExtra("transaction_type", 0);
         int amount = intent.getIntExtra("transaction_amount", 0);
+        Log.d(TAG, "DEBUG " + amount);
         String currentTime = dataEncode.getCurrentTime();
         switch (transactionType) {
             case 1:
-                new Thread(() -> {
-                    String transactionKey = topUp(amount, currentTime);
-                }).start();
+                handleZaloPayPayment(amount);
                 break;
             case 2:
                 new Thread(() -> {
                     String transactionKey = transfer(amount, currentTime);
+                    navigateToTransactionResult(transactionKey, amount, currentTime);
                 }).start();
                 break;
             case 3:
                 new Thread(() -> {
-                    String transactionKey = paying(amount, currentTime, "Thanh toán học phí");
+                    String transactionKey = paying(amount, currentTime, "Thanh toán học phí", Constant.SEMESTER_FEE_TYPE);
+                    navigateToTransactionResult(transactionKey, amount, currentTime);
                 }).start();
                 break;
+            case 4:
+                new Thread(() -> {
+                    String transactionKey = paying(amount, currentTime, "Thanh toán ký túc xá", Constant.DORMITORY_FEE);
+                    navigateToTransactionResult(transactionKey, amount, currentTime);
+                }).start();
+                break;
+            case 5:
+                new Thread(() -> {
+                    String transactionKey = paying(amount, currentTime, "Thanh toán phụ trội ký túc xá", Constant.ADDITIONAL_DORMITORY_FEE_TYPE);
+                    navigateToTransactionResult(transactionKey, amount, currentTime);
+                }).start();
+                break;
+            case 6:
+                new Thread(() -> {
+                    String transactionKey = paying(amount, currentTime, "Thanh toán khoản phạt thư viện", Constant.LIBRARY_FINES);
+                    navigateToTransactionResult(transactionKey, amount, currentTime);
+                }).start();
+                break;
+            case 7:
+                new Thread(() -> {
+                    String transactionKey = paying(amount, currentTime, "Thanh toán tiền học lại", Constant.RE_STUDY_FEE);
+                    navigateToTransactionResult(transactionKey, amount, currentTime);
+                }).start();
+                break;
+            case 8:
+                new Thread(() -> {
+                    String transactionKey = paying(amount, currentTime, "Thanh toán tiền phạt học bổng", Constant.SCHOLARSHIP_PENALTY_FEE);
+                    navigateToTransactionResult(transactionKey, amount, currentTime);
+                }).start();
+                break;
+            default:
+                throw new IllegalStateException("Unexpected value: " + transactionType);
         }
     }
 
     private String topUp(int amount_top_up, String currentTime) {
         SharedPreferences preferences = getSharedPreferences("currentStudent", MODE_PRIVATE);
         String to = preferences.getString("student_roll_number", "");
-        String from = "TP Bank";
+        String from = "ZaloPay";
         String category = "Nạp tiền vào ví";
 
         DatabaseReference reference = databaseReference.child("Student");
@@ -266,7 +321,7 @@ public class PINActivity extends BaseActivity {
         return newTransactionKey;
     }
 
-    private String paying(int transaction_amount, String currentTime, String category) {
+    private String paying(int transaction_amount, String currentTime, String category, String payingType) {
         SharedPreferences preferences = getSharedPreferences("currentStudent", MODE_PRIVATE);
         String student_roll_number = preferences.getString("student_roll_number", "");
 
@@ -289,16 +344,13 @@ public class PINActivity extends BaseActivity {
             public void onCancelled(@NonNull DatabaseError error) {
             }
         });
-        // Update semester_fee in Firebase
-        DatabaseReference feeRef = databaseReference.child("Fee").child(student_roll_number).child("semester_fee");
+        DatabaseReference feeRef = databaseReference.child("Fee").child(student_roll_number).child(payingType);
         feeRef.setValue(0);
 
-        // Update semester_fee in SharedPreferences
         SharedPreferences.Editor editor = preferences.edit();
-        editor.putLong("semester_fee", 0);
+        editor.putLong(payingType, 0);
         editor.apply();
 
-        // Perform the transaction
         DatabaseReference transactionRef = databaseReference.child("Transaction").child(student_roll_number);
         DatabaseReference newTransaction = transactionRef.push();
         List<Transaction> transactions = loadTransaction(transactionRef);
@@ -333,4 +385,61 @@ public class PINActivity extends BaseActivity {
         return transactions;
     }
 
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        ZaloPaySDK.getInstance().onResult(intent);
+    }
+
+    private void handleZaloPayPayment(int total) {
+        CreateOrder orderApi = new CreateOrder();
+        try {
+            @SuppressLint("DefaultLocale") JSONObject data = orderApi.createOrder(String.format("%d", total));
+            String code = data.getString("returncode");
+            if (code.equals("1")) {
+                String token = data.getString("zptranstoken");
+                ZaloPaySDK.getInstance().payOrder(PINActivity.this, token, "demozpdk://app", new PayOrderListener() {
+                    @Override
+                    public void onPaymentSucceeded(String s, String s1, String s2) {
+                        String transactionKey = topUp(total, dataEncode.getCurrentTime());
+                        navigateToTransactionResult(transactionKey, total, dataEncode.getCurrentTime());
+                    }
+
+                    @Override
+                    public void onPaymentCanceled(String s, String s1) {
+                        Intent intent1 = new Intent(PINActivity.this, MainActivity.class);
+                        Toast.makeText(PINActivity.this, "Hủy thanh toán", Toast.LENGTH_SHORT).show();
+                        startActivity(intent1);
+                    }
+
+                    @Override
+                    public void onPaymentError(ZaloPayError zaloPayError, String s, String s1) {
+                        Intent intent1 = new Intent(PINActivity.this, MainActivity.class);
+                        Toast.makeText(PINActivity.this, "Lỗi thanh toánn", Toast.LENGTH_SHORT).show();
+                        startActivity(intent1);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void navigateToTransactionResult(String transactionKey, int amount, String currentTime) {
+        Intent resultIntent = new Intent(PINActivity.this, TransactionResultActivity.class);
+        resultIntent.putExtra("Transaction key", transactionKey);
+        resultIntent.putExtra("Transaction amount", amount);
+        resultIntent.putExtra("Transaction time", currentTime);
+        startActivity(resultIntent);
+        finish();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.hideSoftInputFromWindow(binding.btnConfirmPIN.getWindowToken(), 0);
+        }
+    }
 }
